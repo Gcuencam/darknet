@@ -5,6 +5,7 @@
 #include "cuda.h"
 #include <stdio.h>
 #include <math.h>
+#include <regex.h>
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
@@ -313,8 +314,10 @@ int compare_by_probs(const void *a_ptr, const void *b_ptr) {
     return delta < 0 ? -1 : delta > 0 ? 1 : 0;
 }
 
-void draw_detections_v3(image im, detection *dets, int num, float thresh, char **names, image **alphabet, int classes, int ext_output)
+void draw_detections_v3(image im, detection *dets, int num, float thresh, char **names, image **alphabet, int classes, int ext_output, char *filename, int training)
 {
+    char str[100];
+    int counter = 0;
     static int frame_id = 0;
     frame_id++;
 
@@ -326,7 +329,7 @@ void draw_detections_v3(image im, detection *dets, int num, float thresh, char *
     int i;
     for (i = 0; i < selected_detections_num; ++i) {
         const int best_class = selected_detections[i].best_class;
-        printf("%s: %.0f%%", names[best_class],    selected_detections[i].det.prob[best_class] * 100);
+        printf("%s: %.0f%%", names[best_class], selected_detections[i].det.prob[best_class] * 100);
         if (ext_output)
             printf("\t(left_x: %4.0f   top_y: %4.0f   width: %4.0f   height: %4.0f)\n",
                 round((selected_detections[i].det.bbox.x - selected_detections[i].det.bbox.w / 2)*im.w),
@@ -404,12 +407,31 @@ void draw_detections_v3(image im, detection *dets, int num, float thresh, char *
             //save_image(cropped_im, image_name);
             //free_image(cropped_im);
 
-            if (im.c == 1) {
-                draw_box_width_bw(im, left, top, right, bot, width, 0.8);    // 1 channel Black-White
+            if (!training) {
+                if (im.c == 1) {
+                    draw_box_width_bw(im, left, top, right, bot, width, 0.8);    // 1 channel Black-White
+                }
+                else {
+                    draw_box_width(im, left, top, right, bot, width, red, green, blue); // 3 channels RGB
+                }
             }
-            else {
-                draw_box_width(im, left, top, right, bot, width, red, green, blue); // 3 channels RGB
+
+            float size = (b.w*b.h); /* tamaño de la caja, relativo al tamaño de la imagen */
+
+            /* only for persons bigger than a threshold*/
+            /* CTFG - Ajustar el valor de size, indicarlo en el TFG */
+            printf("%s\n", names[selected_detections[i].best_class]);
+            float probability = selected_detections[i].det.prob[0] * 100;
+            if( (strcmp(names[selected_detections[i].best_class], "person") == 0) && (size > 0.025) && (probability > 80)) {
+                counter = counter + 1;
+                printf("%s %d %d %d %d  %f\n",names[selected_detections[i].best_class],left,right,top,bot,size);
+                if (training) {
+                    const char * numberImage = get_number_image(filename, "[0-9][0-9]");
+                    sprintf(str, "./horus/teams/merge_splitted/%s_%s_%d", "splitted", numberImage, counter ) ;
+                    save_image_png(crop_image(im,left,top,right-left,bot-top),str);
+                }
             }
+
             if (alphabet) {
                 char labelstr[4096] = { 0 };
                 strcat(labelstr, names[selected_detections[i].best_class]);
@@ -437,9 +459,45 @@ void draw_detections_v3(image im, detection *dets, int num, float thresh, char *
     free(selected_detections);
 }
 
-void draw_detections(image im, int num, float thresh, box *boxes, float **probs, char **names, image **alphabet, int classes)
+/*
+ * Match string against the extended regular expression in
+ * pattern, treating errors as no match.
+ *
+ * Return 1 for match, 0 for no match.
+ */
+
+get_number_image(char *string, char *pattern)
 {
+   regex_t preg;
+   int rc;
+   size_t nmatch = 2;
+   regmatch_t pmatch[2];
+ 
+   if (0 != (rc = regcomp(&preg, pattern, 0))) {
+        printf("regcomp() failed, returning nonzero (%d)\n", rc);
+        exit(EXIT_FAILURE);
+   }
+ 
+   if (0 != (rc = regexec(&preg, string, nmatch, pmatch, 0))) {
+        printf("Failed to match '%s' with '%s',returning %d.\n",
+             string, pattern, rc);
+   }
+   else {
+        const char * numberImageWithExt = &string[pmatch[0].rm_so];
+        char * numberImage = (char *) calloc(2, sizeof(char)); 
+        strncpy(numberImage, numberImageWithExt, pmatch[0].rm_eo - pmatch[0].rm_so);
+        return numberImage;
+   }
+   regfree(&preg);
+   return NULL;
+}
+
+void draw_detections(image im, int num, float thresh, box *boxes, float **probs, char **names, image **alphabet, int classes, char *filename, int training)
+{
+    printf("HOLA");
     int i;
+    char str[100];
+    int counter = 0;
 
     for(i = 0; i < num; ++i){
         int class_id = max_index(probs[i], classes);
@@ -485,8 +543,22 @@ void draw_detections(image im, int num, float thresh, box *boxes, float **probs,
             if(bot > im.h-1) bot = im.h-1;
             printf("%s: %.0f%%", names[class_id], prob * 100);
 
+            float size = (b.w*b.h); /* tamaño de la caja, relativo al tamaño de la imagen */
+
             //printf(" - id: %d, x_center: %d, y_center: %d, width: %d, height: %d",
             //    class_id, (right + left) / 2, (bot - top) / 2, right - left, bot - top);
+
+            /* only for persons bigger than a threshold*/
+            /* CTFG - Ajustar el valor de size, indicarlo en el TFG */
+            if( (strcmp(names[class_id], "person") == 0) && (size > 0.025)) {
+                counter = counter + 1;
+                printf("%s %d %d %d %d  %f\n",names[class_id],left,right,top,bot,size);
+                if (training) {
+                    const char * numberImage = get_number_image(filename, "[0-9][0-9]");
+                    sprintf(str, "horus/teams/merge_splitted/%s_%s_%d", "splitted", numberImage, counter ) ;
+                    save_image_png(crop_image(im,left,top,right-left,bot-top),str);
+                }
+            }
 
             printf("\n");
             draw_box_width(im, left, top, right, bot, width, red, green, blue);
@@ -618,6 +690,7 @@ void draw_detections_cv_v3(IplImage* show_img, detection *dets, int num, float t
             //cvResetImageROI(copy_img);
 
             cvRectangle(show_img, pt1, pt2, color, width, 8, 0);
+            printf("HIOHI");
             if (ext_output)
                 printf("\t(left_x: %4.0f   top_y: %4.0f   width: %4.0f   height: %4.0f)\n",
                     (float)left, (float)top, b.w*show_img->width, b.h*show_img->height);

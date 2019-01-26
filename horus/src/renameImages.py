@@ -16,9 +16,9 @@ for root, dirs, files in os.walk(consts.DIR_TEAMS_IMAGES):  # replace the . with
 for i, image in enumerate(os.listdir(consts.DIR_TRAIN_IMAGES)):
     path = os.path.join(consts.DIR_TRAIN_IMAGES, image)
     if (image[-4:] == ".JPG" or image[-4:] == ".jpg" or image[-5:] == ".jpeg") and image[:5] != "train":
-      target = os.path.join(consts.DIR_TRAIN_IMAGES, "train_" + str(i).zfill(2) +  ".jpg")
+      target = os.path.join(consts.DIR_TRAIN_IMAGES, "train_" + str(i).zfill(3) +  ".jpg")
       os.rename(path, target)
     elif image[-4:] == ".png" and image[:5] != "train":
-      target = os.path.join(consts.DIR_TRAIN_IMAGES, "train_" + str(i).zfill(2) +  ".png")
+      target = os.path.join(consts.DIR_TRAIN_IMAGES, "train_" + str(i).zfill(3) +  ".png")
       os.rename(path, target)
 

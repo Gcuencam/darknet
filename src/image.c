@@ -426,7 +426,7 @@ void draw_detections_v3(image im, detection *dets, int num, float thresh, char *
                 counter = counter + 1;
                 printf("%s %d %d %d %d  %f\n",names[selected_detections[i].best_class],left,right,top,bot,size);
                 if (training) {
-                    const char * numberImage = get_number_image(filename, "[0-9][0-9]");
+                    const char * numberImage = get_number_image(filename, "[0-9][0-9][0-9]");
                     sprintf(str, "./horus/teams/merge_splitted/%s_%s_%d", "splitted", numberImage, counter ) ;
                     save_image_png(crop_image(im,left,top,right-left,bot-top),str);
                 }
@@ -470,8 +470,8 @@ get_number_image(char *string, char *pattern)
 {
    regex_t preg;
    int rc;
-   size_t nmatch = 2;
-   regmatch_t pmatch[2];
+   size_t nmatch = 3;
+   regmatch_t pmatch[3];
  
    if (0 != (rc = regcomp(&preg, pattern, 0))) {
         printf("regcomp() failed, returning nonzero (%d)\n", rc);
@@ -484,7 +484,7 @@ get_number_image(char *string, char *pattern)
    }
    else {
         const char * numberImageWithExt = &string[pmatch[0].rm_so];
-        char * numberImage = (char *) calloc(2, sizeof(char)); 
+        char * numberImage = (char *) calloc(3, sizeof(char)); 
         strncpy(numberImage, numberImageWithExt, pmatch[0].rm_eo - pmatch[0].rm_so);
         return numberImage;
    }
